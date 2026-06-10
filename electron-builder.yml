@@ -1,0 +1,23 @@
+# Disguised packaging — no "Kliovo" / "offline" / "POS" in the shipped artifact,
+# install path, or process name, so the app doesn't advertise that it holds the
+# encrypted local store + credentials.
+appId: io.aster.station
+productName: Aster
+directories:
+  output: release
+files:
+  - dist/**/*
+  - package.json
+win:
+  target:
+    - nsis
+  artifactName: Aster-Setup-${version}.${ext}
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  shortcutName: Aster
+mac:
+  target:
+    - dmg
+  category: public.app-category.business

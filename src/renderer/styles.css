@@ -1,0 +1,56 @@
+:root {
+  --bg: #0b1120;
+  --panel: #111a2e;
+  --border: rgba(255, 255, 255, 0.08);
+  --text: #e8edf5;
+  --muted: #8a94a6;
+  --green: #22c55e;
+  --amber: #f59e0b;
+  --red: #ef4444;
+}
+
+* { box-sizing: border-box; }
+html, body, #app { height: 100%; margin: 0; }
+body {
+  font-family: Inter, system-ui, -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+}
+
+.shell { display: flex; flex-direction: column; height: 100%; }
+
+.topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 20px; border-bottom: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.02);
+}
+.brand { font-weight: 700; letter-spacing: 0.2px; }
+.dot { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 8px; }
+.dot::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
+.dot.connected::before { background: var(--green); }
+.dot.checking::before { background: var(--amber); }
+.dot.notfound::before { background: var(--red); }
+
+.center { flex: 1; display: grid; place-items: center; padding: 24px; }
+.card {
+  width: 360px; max-width: 92vw; background: var(--panel);
+  border: 1px solid var(--border); border-radius: 16px; padding: 28px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+}
+.card h2 { margin: 0 0 18px; font-size: 20px; }
+.login label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 14px; }
+.login input {
+  width: 100%; margin-top: 6px; padding: 11px 12px; border-radius: 10px;
+  border: 1px solid var(--border); background: #0c1426; color: var(--text);
+  font-size: 15px; outline: none;
+}
+.login input:focus { border-color: var(--green); }
+button {
+  width: 100%; padding: 12px; border: 0; border-radius: 10px; cursor: pointer;
+  background: var(--green); color: #06210f; font-weight: 700; font-size: 15px;
+}
+button:disabled { opacity: 0.5; cursor: default; }
+.notice button { width: auto; padding: 9px 16px; margin-top: 8px; }
+.msg { margin-top: 14px; font-size: 13px; color: var(--muted); }
+.notice p { color: var(--muted); font-size: 14px; line-height: 1.5; }
