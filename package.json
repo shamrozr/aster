@@ -10,7 +10,9 @@
     "build:main": "tsc -p tsconfig.main.json",
     "build": "npm run build:renderer && npm run build:main",
     "dev:renderer": "vite",
-    "dist:win": "npm run build && electron-builder --win"
+    "dist:win": "npm run build && electron-builder --win",
+    "dist:mac": "npm run build && electron-builder --mac",
+    "dist:all": "npm run build && electron-builder --win --mac"
   },
   "dependencies": {
     "preact": "^10.22.0"

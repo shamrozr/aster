@@ -1,8 +1,9 @@
 name: Build Aster
 
-# Builds the disguised offline POS into a Windows installer.
-# Distribution is manual (installer given only to paying customers), so we
-# upload the artifact (and attach it to a GitHub Release on version tags).
+# Builds the disguised offline POS into installers: Windows (.exe / NSIS) and
+# macOS (.dmg). DMG can only build on a macOS runner, so we use an OS matrix.
+# Distribution is manual (installers given only to paying customers); artifacts
+# are uploaded (and attached to a GitHub Release on v* tags).
 on:
   push:
     branches: [main]
@@ -10,9 +11,21 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-windows:
-    runs-on: windows-latest
-    timeout-minutes: 20
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            flag: "--win"
+            pattern: "release/*.exe"
+            artifact: aster-windows-installer
+          - os: macos-latest
+            flag: "--mac"
+            pattern: "release/*.dmg"
+            artifact: aster-mac-dmg
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -23,16 +36,20 @@ jobs:
         run: npm ci
       - name: Build (renderer + main)
         run: npm run build
-      - name: Package Windows installer
-        run: npx electron-builder --win --publish never
+      - name: Package installer
+        run: npx electron-builder ${{ matrix.flag }} --publish never
+        env:
+          # Unsigned CI builds for now — skip auto codesign discovery so macOS
+          # builds don't fail looking for a Developer ID certificate.
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4
         with:
-          name: aster-windows-installer
-          path: release/*.exe
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.pattern }}
           if-no-files-found: error
       - name: Attach installer to GitHub Release (tags only)
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: release/*.exe
+          files: ${{ matrix.pattern }}
