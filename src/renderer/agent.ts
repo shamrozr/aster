@@ -1,5 +1,5 @@
 // Client for the local agent (the only thing this app talks to).
-import type { MenuPayload, Order, TableRow } from "./types";
+import type { Combo, MenuPayload, Order, PaymentConfig, TableRow } from "./types";
 
 const AGENT = "http://127.0.0.1:6310";
 
@@ -72,11 +72,13 @@ function post<T>(path: string, body: unknown): Promise<T> {
 export const pos = {
   menu: () => authed<{ menu: MenuPayload }>("/local/pos/menu").then((d) => d.menu),
   tables: () => authed<{ tables: TableRow[] }>("/local/pos/tables").then((d) => d.tables),
+  combos: () => authed<{ combos: Combo[] }>("/local/pos/combos").then((d) => d.combos),
+  config: () => authed<{ config: PaymentConfig }>("/local/pos/config").then((d) => d.config),
   orders: () => authed<{ orders: Order[] }>("/local/pos/orders").then((d) => d.orders),
   create: (payload: unknown) =>
     post<{ order: Order }>("/local/pos/order/create", payload).then((d) => d.order),
-  pay: (orderId: string, method: string, amount: number) =>
-    post<{ order: Order }>("/local/pos/order/pay", { orderId, method, amount }).then((d) => d.order),
+  pay: (orderId: string, method: string, amount: number, note?: string) =>
+    post<{ order: Order }>("/local/pos/order/pay", { orderId, method, amount, note }).then((d) => d.order),
   setStatus: (orderId: string, status: string) =>
     post<{ order: Order }>("/local/pos/order/status", { orderId, status }).then((d) => d.order),
 };

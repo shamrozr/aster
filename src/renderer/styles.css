@@ -115,3 +115,39 @@ button:disabled { opacity: 0.5; cursor: default; }
 .s-ready, .s-served { background: rgba(34,197,94,0.15); color: var(--green); }
 .p-paid { background: rgba(34,197,94,0.15); color: var(--green); }
 .p-unpaid, .p-partial { background: rgba(239,68,68,0.15); color: var(--red); }
+
+/* ── modifier / variant / combo sheets ───────────────────────── */
+.ibadge { position: absolute; top: 6px; right: 6px; font-size: 9px; text-transform: uppercase;
+          letter-spacing: .04em; background: rgba(34,197,94,0.18); color: var(--green);
+          padding: 2px 6px; border-radius: 999px; }
+.item { position: relative; }
+.item.combo { border-color: rgba(34,197,94,0.4); }
+.cat-tabs .deals { color: var(--green); }
+.cat-tabs .deals.on { background: var(--green); color: #04130b; }
+
+.lcol { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.lmods { font-size: 11px; color: var(--muted); }
+.totals.sub { font-size: 13px; color: var(--muted); }
+.totals.sub b { color: var(--text); }
+
+.methods .pindot { color: var(--amber, #f59e0b); font-size: 9px; margin-left: 4px; vertical-align: middle; }
+.ref { width: 100%; margin-top: 10px; padding: 10px 12px; border-radius: 8px;
+       border: 1px solid var(--border); background: var(--panel); color: var(--text); font-size: 14px; }
+
+.sheet-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.55); display: flex;
+            align-items: flex-end; justify-content: center; z-index: 50; }
+.sheet { width: 100%; max-width: 560px; max-height: 85vh; overflow-y: auto;
+         background: var(--panel, #131a26); border: 1px solid var(--border);
+         border-radius: 16px 16px 0 0; padding: 18px 18px 14px; }
+.sheet h3 { margin: 0 0 14px; font-size: 17px; }
+.grp { margin-bottom: 16px; }
+.grp-h { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin-bottom: 8px; }
+.grp-h .req { color: var(--red); font-size: 10px; margin-left: 6px; text-transform: none; }
+.grp-h .hint { color: var(--muted); font-size: 11px; text-transform: none; }
+.opts { display: flex; flex-wrap: wrap; gap: 8px; }
+.opt { padding: 9px 13px; border-radius: 10px; border: 1px solid var(--border);
+       background: var(--panel); color: var(--text); font-size: 14px; cursor: pointer; }
+.opt.on { background: var(--green); color: #04130b; border-color: var(--green); }
+.sheet-foot { display: flex; gap: 10px; align-items: center; justify-content: space-between;
+              position: sticky; bottom: 0; padding-top: 10px; background: var(--panel); }
+.sheet-foot .primary { flex: 1; }
