@@ -394,10 +394,13 @@ function ComboSheet({ combo, menu, onClose, onAdd }: { combo: Combo; menu: MenuP
         <div class="sheet-foot">
           <button class="link" onClick={onClose}>Cancel</button>
           <button class="primary" disabled={!allPicked} onClick={() => onAdd({
-            lineId: uid(), menuItemId: combo.id, comboId: combo.id, name: combo.name,
+            // menuItemId empty: a combo isn't a MenuItem, so reconcile won't try to
+            // validate it. The combo id + chosen components live in notes for
+            // re-explosion online.
+            lineId: uid(), menuItemId: "", comboId: combo.id, name: combo.name,
             unitPrice: price, quantity: 1,
             modifiers: chosen.map((i) => ({ name: itemName(i.menuItemId), priceAdjustment: 0 })),
-            notes: "COMBO:" + JSON.stringify(chosen.map((i) => ({ menuItemId: i.menuItemId, variantId: i.variantId }))),
+            notes: "COMBO:" + JSON.stringify({ comboId: combo.id, components: chosen.map((i) => ({ menuItemId: i.menuItemId, variantId: i.variantId })) }),
           })}>
             Add deal · {rs(price)}
           </button>
