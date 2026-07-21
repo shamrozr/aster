@@ -18,7 +18,7 @@ import {
 import { Ic } from "./icons";
 import { ItemSheet } from "./ItemSheet";
 import { ComboSheet } from "./ComboSheet";
-import { rs, roundCash, STATUS_FLOW, typeIcon, typeLabel, lineTotal, uid } from "./shared";
+import { rs, roundCash, STATUS_FLOW, typeIcon, typeLabel, lineTotal, toWireItem, uid } from "./shared";
 import { ManagerPinModal, type ManagerPinResult } from "./ManagerPinModal";
 
 type Filter = "all" | "open" | "unpaid" | "online";
@@ -291,19 +291,7 @@ function OrderDetail({
     if (pending.length === 0) return;
     setBusy(true); setErr(null);
     try {
-      await pos.addItems(
-        order.id,
-        pending.map((l) => ({
-          menuItemId: l.menuItemId,
-          variantId: l.variantId ?? null,
-          name: l.name,
-          quantity: l.quantity,
-          unitPrice: l.unitPrice,
-          modifiers: l.modifiers,
-          notes: l.notes ?? null,
-          combo: l.combo ?? null,
-        }))
-      );
+      await pos.addItems(order.id, pending.map(toWireItem));
       setPending([]);
       onChanged();
     } catch (e) { setErr((e as Error).message); }

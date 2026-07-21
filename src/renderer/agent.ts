@@ -112,15 +112,23 @@ export const pos = {
     return authed<{ order: Order }>(`/local/pos/order?id=${encodeURIComponent(orderId)}`).then((d) => d.order);
   },
   create: (payload: unknown): Promise<Order> => {
-    // NOTE: combo lines must carry the structured `combo` field (ComboSelection)
-    // instead of `COMBO:` JSON stuffed into notes — see types.ts ComboSelection.
+    // NOTE: combo lines carry FLAT combo fields (comboId/comboName/comboPrice/
+    // picks) on each item — the shape the agent reads (pos-repo.ts). Built via
+    // toWireItem() in ui/shared.ts; never `COMBO:` JSON stuffed into notes.
     if (MOCK) return mockPos.create(payload);
     return post<{ order: Order }>("/local/pos/order/create", payload).then((d) => d.order);
   },
   // Fires ONLY the new items against a running order (born-offline or continued).
-  addItems: (orderId: string, items: unknown[]): Promise<Order> => {
+  // The agent's route is singular (/local/pos/order/add-item, { orderId, item }),
+  // so we fire each pending line in order — one KOT per item — and return the
+  // final order state.
+  addItems: async (orderId: string, items: unknown[]): Promise<Order> => {
     if (MOCK) return mockPos.addItems(orderId, items);
-    return post<{ order: Order }>("/local/pos/order/add-items", { orderId, items }).then((d) => d.order);
+    let order: Order | null = null;
+    for (const item of items) {
+      order = await post<{ order: Order }>("/local/pos/order/add-item", { orderId, item }).then((d) => d.order);
+    }
+    return order ?? pos.order(orderId);
   },
   // Voiding marks the item voided + appends an item_voided event; it never
   // deletes the item and never reduces already-recorded cash. Requires a

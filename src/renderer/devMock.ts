@@ -677,10 +677,10 @@ export const mockPos = {
     await delay(200);
     const items = (payload?.items ?? []).map((it: any, idx: number) => ({
       id: `it-mock-${nextItemSeq++}`,
-      name: it.name ?? it.combo?.comboName ?? "Item",
+      name: it.name ?? it.comboName ?? "Item",
       quantity: it.quantity ?? 1,
-      unit_price: it.unitPrice ?? it.combo?.comboPrice ?? 0,
-      total_price: (it.unitPrice ?? it.combo?.comboPrice ?? 0) * (it.quantity ?? 1),
+      unit_price: it.unitPrice ?? it.comboPrice ?? 0,
+      total_price: (it.unitPrice ?? it.comboPrice ?? 0) * (it.quantity ?? 1),
       kitchen_status: "pending",
       fired: true,
       category: it.category ?? null,
@@ -721,10 +721,10 @@ export const mockPos = {
     if (!o) throw new Error("Order not found");
     const newItems = (items ?? []).map((it: any) => ({
       id: `it-mock-${nextItemSeq++}`,
-      name: it.name ?? it.combo?.comboName ?? "Item",
+      name: it.name ?? it.comboName ?? "Item",
       quantity: it.quantity ?? 1,
-      unit_price: it.unitPrice ?? it.combo?.comboPrice ?? 0,
-      total_price: (it.unitPrice ?? it.combo?.comboPrice ?? 0) * (it.quantity ?? 1),
+      unit_price: it.unitPrice ?? it.comboPrice ?? 0,
+      total_price: (it.unitPrice ?? it.comboPrice ?? 0) * (it.quantity ?? 1),
       kitchen_status: "pending",
       fired: true,
       category: it.category ?? null,

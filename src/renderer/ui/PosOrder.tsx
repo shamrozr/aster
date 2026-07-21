@@ -15,7 +15,7 @@ import {
 import { Ic } from "./icons";
 import { ItemSheet } from "./ItemSheet";
 import { ComboSheet } from "./ComboSheet";
-import { lineTotal, roundCash, rs, SOURCE_LABEL, SOURCES, uid, type Source } from "./shared";
+import { lineTotal, roundCash, rs, SOURCE_LABEL, SOURCES, toWireItem, uid, type Source } from "./shared";
 import type { AsterUser } from "../agent";
 
 // Payment methods that are never offered offline — comp/discount/refund are
@@ -141,16 +141,7 @@ export function PosOrder({
         guestName: guestQuery.trim() || null,
         taxRate,
         serviceChargeRate: scRate,
-        items: cart.map((l) => ({
-          menuItemId: l.menuItemId,
-          variantId: l.variantId ?? null,
-          name: l.name,
-          quantity: l.quantity,
-          unitPrice: l.unitPrice,
-          modifiers: l.modifiers,
-          notes: l.notes ?? null,
-          combo: l.combo ?? null,
-        })),
+        items: cart.map(toWireItem),
       });
       setPlaced(order);
       onOrderPlaced();

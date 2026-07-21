@@ -21,6 +21,31 @@ export function lineTotal(l: CartLine): number {
   return (l.unitPrice + mods) * l.quantity;
 }
 
+// Maps a cart line to the on-the-wire item shape the local agent expects on
+// /local/pos/order/create and /local/pos/order/add-item. Combo lines flatten
+// their ComboSelection into the FLAT combo_* fields the agent reads
+// (comboId / comboName / comboPrice / picks — see pos-repo.ts CreateOrderInput
+// and addItem). The agent persists these and, on reconnect, pushes the
+// structured combo up so the Dine server explodes it + depletes stock; the KOT
+// shows the combo name + component picks for the kitchen. Plain lines leave the
+// combo fields null → the agent treats them as a normal item (unchanged).
+export function toWireItem(l: CartLine) {
+  const combo = l.combo ?? null;
+  return {
+    menuItemId: l.menuItemId || null, // combo lines carry no menu_item_id
+    variantId: l.variantId ?? null,
+    name: l.name,
+    quantity: l.quantity,
+    unitPrice: l.unitPrice,
+    modifiers: l.modifiers,
+    notes: l.notes ?? null,
+    comboId: combo?.comboId ?? null,
+    comboName: combo?.comboName ?? null,
+    comboPrice: combo?.comboPrice ?? null,
+    picks: combo?.picks ?? null,
+  };
+}
+
 export function roundCash(n: number, nearest: number): number {
   if (!nearest || nearest <= 0) return n;
   return Math.round(n / nearest) * nearest;
