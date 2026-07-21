@@ -34,16 +34,26 @@ export interface MenuItem {
   available: boolean;
   modifierGroups: ModifierGroup[];
   variants: Variant[];
+  brandId?: string | null;
 }
 
 export interface MenuCategory {
   id: string;
   name: string;
   items: MenuItem[];
+  brandId?: string | null;
+}
+
+export interface Brand {
+  id: string;
+  name: string;
+  color: string;
+  sortOrder: number;
 }
 
 export interface MenuPayload {
   categories: MenuCategory[];
+  brands?: Brand[];
 }
 
 export interface TableRow {
@@ -103,6 +113,22 @@ export interface CartModifier {
   priceAdjustment: number;
 }
 
+// ── Structured combo payload (replaces the old `COMBO:` JSON-in-notes hack) ──
+export interface ComboPick {
+  groupId: string;
+  menuItemId: string;
+  variantId: string | null;
+  upcharge: number;
+}
+
+export interface ComboSelection {
+  comboId: string;
+  comboName: string;
+  comboPrice: number;
+  picks: ComboPick[];
+  quantity: number;
+}
+
 export interface CartLine {
   lineId: string; // unique — same item with different modifiers is a distinct line
   menuItemId: string;
@@ -113,6 +139,43 @@ export interface CartLine {
   modifiers: CartModifier[];
   comboId?: string | null;
   notes?: string | null;
+  // Structured combo payload — source of truth for combo lines. `comboId`/`notes`
+  // above are kept for backward compat but should not carry `COMBO:` JSON anymore.
+  combo?: ComboSelection | null;
+}
+
+// ── Order kind: born-offline (OFF-...) vs continued/online (ORD-...) ────────
+export type OrderKind = "offline" | "online";
+
+export function orderKind(ref: string): OrderKind {
+  return ref && ref.startsWith("OFF-") ? "offline" : "online";
+}
+
+// ── Append-only audit trail ──────────────────────────────────────────────
+// Sensitive actions (void a fired item, force-unlock a locked order, reprint
+// after the first) require a manager PIN + a reason, and are logged here.
+// Comp, discount, and refund are disabled offline (cash-first) — no event
+// types exist for them, and there is no "cancel" event: the safe way to kill
+// an order is to void every item on it (logged, auditable), never delete it.
+export type OrderEventType =
+  | "created"
+  | "item_added"
+  | "item_fired"
+  | "item_voided"
+  | "payment_recorded"
+  | "status_changed"
+  | "reprinted"
+  | "manager_unlock";
+
+export interface OrderEvent {
+  id: string;
+  at: number;
+  type: OrderEventType;
+  actor: string;
+  authorizedBy?: string | null; // manager who approved via PIN, when applicable
+  reason?: string | null;
+  summary: string;
+  synced: boolean; // false until this event has reconciled up to the cloud
 }
 
 export interface Order {
@@ -132,8 +195,20 @@ export interface Order {
   payment_status: string;
   kitchen_status: string | null;
   created_at: number;
-  items?: Array<{ id: string; name: string; quantity: number; unit_price: number; total_price: number }>;
+  items?: Array<{
+    id: string;
+    name: string;
+    quantity: number;
+    unit_price: number;
+    total_price: number;
+    kitchen_status?: string | null;
+    fired?: boolean; // true = already sent to kitchen / locked from editing
+    category?: string | null; // for the kitchen/category badge
+    voided?: boolean; // struck-through, never removed from the order
+    voidReason?: string | null;
+  }>;
   payments?: Array<{ id: string; method: string; amount: number; is_refunded: number }>;
+  events?: OrderEvent[];
 }
 
 // Fallback enabled set when config hasn't synced (mirrors Dine's defaultEnabled).

@@ -1,5 +1,6 @@
 // Client for the local agent (the only thing this app talks to).
-import type { Combo, MenuPayload, Order, PaymentConfig, TableRow } from "./types";
+import type { Brand, Combo, MenuPayload, Order, PaymentConfig, TableRow } from "./types";
+import { MOCK, mockLogin, mockPing, mockPos, mockVerifyManagerPin } from "./devMock";
 
 const AGENT = "http://127.0.0.1:6310";
 
@@ -18,6 +19,7 @@ export interface AsterUser {
 }
 
 export async function ping(): Promise<PingResult> {
+  if (MOCK) return mockPing();
   try {
     const r = await fetch(`${AGENT}/ping`, { signal: AbortSignal.timeout(2000) });
     if (!r.ok) return { ok: false };
@@ -31,6 +33,11 @@ export async function login(
   email: string,
   password: string
 ): Promise<{ ok: boolean; token?: string; user?: AsterUser; error?: string }> {
+  if (MOCK) {
+    const data = await mockLogin(email, password);
+    if (data?.ok && data.token) token = data.token;
+    return data;
+  }
   try {
     const r = await fetch(`${AGENT}/local/auth`, {
       method: "POST",
@@ -70,15 +77,87 @@ function post<T>(path: string, body: unknown): Promise<T> {
 }
 
 export const pos = {
-  menu: () => authed<{ menu: MenuPayload }>("/local/pos/menu").then((d) => d.menu),
-  tables: () => authed<{ tables: TableRow[] }>("/local/pos/tables").then((d) => d.tables),
-  combos: () => authed<{ combos: Combo[] }>("/local/pos/combos").then((d) => d.combos),
-  config: () => authed<{ config: PaymentConfig }>("/local/pos/config").then((d) => d.config),
-  orders: () => authed<{ orders: Order[] }>("/local/pos/orders").then((d) => d.orders),
-  create: (payload: unknown) =>
-    post<{ order: Order }>("/local/pos/order/create", payload).then((d) => d.order),
-  pay: (orderId: string, method: string, amount: number, note?: string) =>
-    post<{ order: Order }>("/local/pos/order/pay", { orderId, method, amount, note }).then((d) => d.order),
-  setStatus: (orderId: string, status: string) =>
-    post<{ order: Order }>("/local/pos/order/status", { orderId, status }).then((d) => d.order),
+  menu: (): Promise<MenuPayload> => {
+    if (MOCK) return mockPos.menu();
+    return authed<{ menu: MenuPayload }>("/local/pos/menu").then((d) => d.menu);
+  },
+  brands: (): Promise<Brand[]> => {
+    if (MOCK) return mockPos.brands();
+    return authed<{ brands: Brand[] }>("/local/pos/brands").then((d) => d.brands);
+  },
+  tables: (): Promise<TableRow[]> => {
+    if (MOCK) return mockPos.tables();
+    return authed<{ tables: TableRow[] }>("/local/pos/tables").then((d) => d.tables);
+  },
+  combos: (): Promise<Combo[]> => {
+    if (MOCK) return mockPos.combos();
+    return authed<{ combos: Combo[] }>("/local/pos/combos").then((d) => d.combos);
+  },
+  config: (): Promise<PaymentConfig> => {
+    if (MOCK) return mockPos.config();
+    return authed<{ config: PaymentConfig }>("/local/pos/config").then((d) => d.config);
+  },
+  orders: (): Promise<Order[]> => {
+    if (MOCK) return mockPos.orders();
+    return authed<{ orders: Order[] }>("/local/pos/orders").then((d) => d.orders);
+  },
+  // Running/unpaid orders incl. continued ORD- tabs that came down in the snapshot.
+  openOrders: (): Promise<Order[]> => {
+    if (MOCK) return mockPos.openOrders();
+    return authed<{ orders: Order[] }>("/local/pos/orders/open").then((d) => d.orders);
+  },
+  // Full detail (incl. items) for a single order.
+  order: (orderId: string): Promise<Order> => {
+    if (MOCK) return mockPos.order(orderId);
+    return authed<{ order: Order }>(`/local/pos/order?id=${encodeURIComponent(orderId)}`).then((d) => d.order);
+  },
+  create: (payload: unknown): Promise<Order> => {
+    // NOTE: combo lines must carry the structured `combo` field (ComboSelection)
+    // instead of `COMBO:` JSON stuffed into notes — see types.ts ComboSelection.
+    if (MOCK) return mockPos.create(payload);
+    return post<{ order: Order }>("/local/pos/order/create", payload).then((d) => d.order);
+  },
+  // Fires ONLY the new items against a running order (born-offline or continued).
+  addItems: (orderId: string, items: unknown[]): Promise<Order> => {
+    if (MOCK) return mockPos.addItems(orderId, items);
+    return post<{ order: Order }>("/local/pos/order/add-items", { orderId, items }).then((d) => d.order);
+  },
+  // Voiding marks the item voided + appends an item_voided event; it never
+  // deletes the item and never reduces already-recorded cash. Requires a
+  // manager PIN + a reason (the agent enforces; mock verifies too).
+  voidItem: (orderId: string, itemId: string, reason: string, managerPin: string): Promise<Order> => {
+    if (MOCK) return mockPos.voidItem(orderId, itemId, reason, managerPin);
+    return post<{ order: Order }>("/local/pos/order/void-item", { orderId, itemId, reason, managerPin }).then(
+      (d) => d.order
+    );
+  },
+  // Verifies a manager PIN without performing any action — used to gate
+  // sensitive UI actions (void, unlock, second reprint) before submitting.
+  verifyManagerPin: (pin: string): Promise<{ ok: boolean; managerName?: string }> => {
+    if (MOCK) return mockVerifyManagerPin(pin);
+    return post<{ ok: boolean; managerName?: string }>("/local/pos/manager/verify", { pin });
+  },
+  // Force-unlocks a locked order (e.g. re-opens editing after fire/lock).
+  // Appends a manager_unlock event. Requires manager PIN + reason.
+  forceUnlock: (orderId: string, managerPin: string, reason: string): Promise<Order> => {
+    if (MOCK) return mockPos.forceUnlock(orderId, managerPin, reason);
+    return post<{ order: Order }>("/local/pos/order/unlock", { orderId, managerPin, reason }).then((d) => d.order);
+  },
+  // Method-agnostic on the wire; the UI restricts to cash offline (comp,
+  // discount, and refund are disabled offline — cash-first).
+  pay: (orderId: string, method: string, amount: number, note?: string): Promise<Order> => {
+    if (MOCK) return mockPos.pay(orderId, method, amount, note);
+    return post<{ order: Order }>("/local/pos/order/pay", { orderId, method, amount, note }).then((d) => d.order);
+  },
+  setStatus: (orderId: string, status: string): Promise<Order> => {
+    if (MOCK) return mockPos.setStatus(orderId, status);
+    return post<{ order: Order }>("/local/pos/order/status", { orderId, status }).then((d) => d.order);
+  },
+  // First reprint of an order is free; a subsequent reprint requires
+  // managerPin (the agent enforces; UI passes it once the order already has
+  // a `reprinted` event). Appends a reprinted event either way.
+  reprint: (orderId: string, kind: "kot" | "receipt", managerPin?: string): Promise<{ ok: true }> => {
+    if (MOCK) return mockPos.reprint(orderId, kind, managerPin);
+    return post<{ ok: true }>("/local/pos/print/reprint", { orderId, kind, managerPin });
+  },
 };

@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "aster-renderer",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["dev:renderer"],
+      "port": 5273
+    }
+  ]
+}

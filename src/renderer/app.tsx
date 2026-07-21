@@ -1,6 +1,8 @@
 import { useEffect, useState } from "preact/hooks";
 import { ping, login, type AsterUser } from "./agent";
 import { Pos } from "./pos";
+import { Ic, IconSprite } from "./ui/icons";
+import { useTheme } from "./ui/theme";
 
 type Conn = "checking" | "connected" | "notfound";
 
@@ -45,24 +47,34 @@ function Login({ conn, recheck, onLogin }: { conn: Conn; recheck: () => void; on
     }
   }
 
+  useTheme();
+
   return (
-    <div class="shell">
-      <header class="topbar">
-        <div class="brand">Aster Station</div>
-        <div class={`dot ${conn}`} title={conn}>
+    <div class="login-shell">
+      <IconSprite />
+      <header class="login-top">
+        <div class="login-brand">
+          <span class="m">
+            <Ic id="i-pos" size={15} />
+          </span>
+          Aster
+        </div>
+        <div class={`login-status ${conn}`}>
+          <span class="dotlamp" />
           {conn === "connected" ? "Local service connected" : conn === "checking" ? "Connecting…" : "Local service not found"}
         </div>
       </header>
-      <main class="center">
+      <main class="login-center">
         {conn === "notfound" ? (
-          <div class="card notice">
+          <div class="login-card login-notice">
             <h2>Local service not found</h2>
-            <p>The local service isn't running on this computer. Contact your administrator.</p>
+            <p class="sub">The local service isn't running on this computer. Contact your administrator.</p>
             <button onClick={recheck}>Retry</button>
           </div>
         ) : (
-          <form class="card login" onSubmit={onSubmit}>
+          <form class="login-card" onSubmit={onSubmit}>
             <h2>Sign in</h2>
+            <p class="sub">Use your staff credentials to open the till.</p>
             <label>
               Email
               <input type="email" value={email} onInput={(e) => setEmail((e.target as HTMLInputElement).value)} required />
@@ -71,7 +83,9 @@ function Login({ conn, recheck, onLogin }: { conn: Conn; recheck: () => void; on
               Password
               <input type="password" value={password} onInput={(e) => setPassword((e.target as HTMLInputElement).value)} required />
             </label>
-            <button type="submit" disabled={busy || conn !== "connected"}>{busy ? "Signing in…" : "Sign in"}</button>
+            <button type="submit" disabled={busy || conn !== "connected"}>
+              {busy ? "Signing in…" : "Sign in"}
+            </button>
             {msg && <p class="msg">{msg}</p>}
           </form>
         )}
