@@ -1,27 +1,19 @@
 import { useEffect, useMemo, useState } from "preact/hooks";
 import { pos } from "../agent";
 import {
-  DEFAULT_ENABLED_METHODS,
   TERMINAL_CODE,
   type CartLine,
   type Combo,
   type MenuItem,
   type MenuPayload,
-  type Order,
   type PaymentConfig,
-  type PaymentMethodDef,
   type TableRow,
 } from "../types";
 import { Ic } from "./icons";
 import { ItemSheet } from "./ItemSheet";
 import { ComboSheet } from "./ComboSheet";
-import { lineTotal, roundCash, rs, SOURCE_LABEL, SOURCES, toWireItem, uid, type Source } from "./shared";
+import { lineTotal, rs, SOURCE_LABEL, SOURCES, toWireItem, uid, type Source } from "./shared";
 import type { AsterUser } from "../agent";
-
-// Payment methods that are never offered offline — comp/discount/refund are
-// cash-first-only, disabled entirely on this app (see CLAUDE.md policy B).
-const EXCLUDED_METHOD_KEYS = new Set(["complimentary", "comp", "discount", "refund"]);
-const EXCLUDED_CATEGORIES = new Set(["comp", "discount", "refund"]);
 
 export function PosOrder({
   user,
@@ -52,9 +44,10 @@ export function PosOrder({
   const [guestEditing, setGuestEditing] = useState(false);
 
   const [cart, setCart] = useState<CartLine[]>([]);
-  const [placed, setPlaced] = useState<Order | null>(null);
-  const [payMethod, setPayMethod] = useState("cash");
-  const [payRef, setPayRef] = useState("");
+  // Placing fires the order WITHOUT taking payment — we just show a short
+  // confirmation (the reference) and reset for the next order. Payment is
+  // collected later from the Orders detail screen, never here.
+  const [justPlaced, setJustPlaced] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -89,22 +82,6 @@ export function PosOrder({
   const sc = Math.round((subtotal * scRate) / 100);
   const total = subtotal + tax + sc;
 
-  // Cash-first offline: comp/discount/refund are never offered (policy B).
-  const tiles: PaymentMethodDef[] = useMemo(() => {
-    const enabled = config?.paymentMethods?.enabledMethods ?? DEFAULT_ENABLED_METHODS;
-    const defs = config?.methodDefs ?? [];
-    if (!defs.length) {
-      return enabled
-        .filter((k) => !EXCLUDED_METHOD_KEYS.has(k))
-        .map((k) => ({
-          key: k, label: k, shortLabel: k, category: "primary",
-          requiresManagerPin: false, requiresRef: false, requiresBankAccount: false,
-          requiresStaffSelect: false, requiresWalletContact: false,
-        }));
-    }
-    return defs.filter((d) => enabled.includes(d.key) && !EXCLUDED_METHOD_KEYS.has(d.key) && !EXCLUDED_CATEGORIES.has(d.category));
-  }, [config]);
-
   function addLine(line: CartLine) {
     setCart((c) => {
       if (!line.comboId && line.modifiers.length === 0) {
@@ -128,7 +105,7 @@ export function PosOrder({
     setCart((c) => (q <= 0 ? c.filter((l) => l.lineId !== lineId) : c.map((l) => (l.lineId === lineId ? { ...l, quantity: q } : l))));
   }
   function resetDraft() {
-    setCart([]); setPlaced(null); setErr(null); setPayRef(""); setPayMethod("cash");
+    setCart([]); setErr(null); setJustPlaced(null);
   }
 
   async function place() {
@@ -143,24 +120,8 @@ export function PosOrder({
         serviceChargeRate: scRate,
         items: cart.map(toWireItem),
       });
-      setPlaced(order);
-      onOrderPlaced();
-    } catch (e) { setErr((e as Error).message); }
-    setBusy(false);
-  }
-
-  const activeDef = tiles.find((t) => t.key === payMethod);
-  const needRef = !!activeDef?.requiresRef || (payMethod === "card" && !!config?.paymentMethods?.requireRefForCard);
-  const cashRound = config?.paymentMethods?.cashRoundToNearest ?? 0;
-  const collectAmount = payMethod === "cash" ? roundCash(placed?.total_amount ?? 0, cashRound) : placed?.total_amount ?? 0;
-
-  async function collect() {
-    if (!placed) return;
-    if (needRef && !payRef.trim()) { setErr("Reference required for this method."); return; }
-    setBusy(true); setErr(null);
-    try {
-      await pos.pay(placed.id, payMethod, collectAmount, payRef.trim() || undefined);
-      resetDraft();
+      setJustPlaced(order.reference);
+      setCart([]);
       onOrderPlaced();
     } catch (e) { setErr((e as Error).message); }
     setBusy(false);
@@ -325,8 +286,20 @@ export function PosOrder({
         </div>
 
         <aside class="pos-right">
-          {!placed ? (
-            <>
+          {justPlaced && (
+            <div
+              class="placed-banner"
+              style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", margin: "0 0 10px", background: "rgba(34,197,94,.12)", color: "#16a34a", borderRadius: 10, fontSize: 13, fontWeight: 600 }}
+            >
+              <Ic id="i-check" size={16} />
+              <span style={{ flex: 1 }}>
+                Order <b>{justPlaced}</b> sent to kitchen. Collect payment from <b>Orders</b> when the guest pays.
+              </span>
+              <button class="link" onClick={() => setJustPlaced(null)}>
+                Dismiss
+              </button>
+            </div>
+          )}
               <div class="shiftbanner">
                 <div class="sr">
                   <Ic id="i-clock" />
@@ -413,41 +386,6 @@ export function PosOrder({
                   </div>
                 </>
               )}
-            </>
-          ) : (
-            <div class="paypane">
-              <h3>{placed.reference}</h3>
-              <div class="carttotals" style={{ padding: 0 }}>
-                <div class="tr big">
-                  <span>Total</span>
-                  <span>{rs(placed.total_amount)}</span>
-                </div>
-              </div>
-              <div class="paytiles">
-                {tiles.map((m) => (
-                  <button key={m.key} class={m.key === payMethod ? "on" : ""} onClick={() => { setPayMethod(m.key); setPayRef(""); }}>
-                    {m.shortLabel || m.label}
-                    {m.requiresManagerPin && <span title="Manager approval"> ●</span>}
-                  </button>
-                ))}
-              </div>
-              {needRef && (
-                <input class="payfield" placeholder="Reference / auth code" value={payRef} onInput={(e) => setPayRef((e.target as HTMLInputElement).value)} />
-              )}
-              {payMethod === "cash" && cashRound > 0 && collectAmount !== placed.total_amount && (
-                <p class="muted">Cash rounded to {rs(collectAmount)} (nearest {cashRound}).</p>
-              )}
-              {err && <p class="err">{err}</p>}
-              <div class="cartfoot" style={{ padding: 0 }}>
-                <button class="primary" disabled={busy} onClick={collect}>
-                  {busy ? "Collecting…" : `Collect ${rs(collectAmount)}`}
-                </button>
-              </div>
-              <button class="cl-remove" onClick={resetDraft}>
-                New order without payment
-              </button>
-            </div>
-          )}
         </aside>
       </div>
 

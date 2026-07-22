@@ -63,7 +63,6 @@ export function Orders() {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [selected, setSelected] = useState<Order | null>(null);
 
   async function loadList() {
     try {
@@ -82,17 +81,13 @@ export function Orders() {
     return () => clearInterval(id);
   }, []);
 
-  async function loadDetail(id: string) {
-    try { setSelected(await pos.order(id)); } catch (e) { setErr((e as Error).message); }
-  }
-  useEffect(() => {
-    if (selectedId) void loadDetail(selectedId);
-    else setSelected(null);
-  }, [selectedId]);
+  // The orders list already carries full items + payments (agent listOrders),
+  // so the detail view reads straight from the loaded list — this agent exposes
+  // no order-by-id route. Selecting an order just picks it out of `orders`.
+  const selected = useMemo(() => orders.find((o) => o.id === selectedId) ?? null, [orders, selectedId]);
 
   async function refresh() {
     await loadList();
-    if (selectedId) await loadDetail(selectedId);
   }
 
   const filtered = useMemo(() => {
