@@ -1,5 +1,5 @@
 import { Fragment } from "preact";
-import { useEffect, useMemo, useState } from "preact/hooks";
+import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { pos } from "../agent";
 import {
   DEFAULT_ENABLED_METHODS,
@@ -54,12 +54,17 @@ export function Orders() {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // The 8s poll keeps calling the mount-time loadList closure; without this ref
+  // it would read a frozen selectedId (null) and re-select the newest order on
+  // every tick — yanking you off whatever order you clicked.
+  const selectedIdRef = useRef<string | null>(null);
+  selectedIdRef.current = selectedId;
 
   async function loadList() {
     try {
       const list = await pos.orders();
       setOrders(list);
-      if (!selectedId && list.length > 0) setSelectedId(list[0].id);
+      if (!selectedIdRef.current && list.length > 0) setSelectedId(list[0].id);
     } catch (e) { setErr((e as Error).message); }
   }
   useEffect(() => {

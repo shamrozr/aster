@@ -139,6 +139,6 @@ export const pos = {
   // a `reprinted` event). Appends a reprinted event either way.
   reprint: (orderId: string, kind: "kot" | "receipt", managerPin?: string): Promise<{ ok: true }> => {
     if (MOCK) return mockPos.reprint(orderId, kind, managerPin);
-    return post<{ ok: true }>("/local/pos/print/reprint", { orderId, kind, managerPin });
+    return post<{ ok: true }>("/local/print/reprint", { orderId, kind, managerPin });
   },
 };

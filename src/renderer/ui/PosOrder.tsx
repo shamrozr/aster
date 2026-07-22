@@ -44,6 +44,10 @@ export function PosOrder({
   const [guestEditing, setGuestEditing] = useState(false);
 
   const [cart, setCart] = useState<CartLine[]>([]);
+  // Stable per-draft idempotency key: a double-tapped "Place order" (or a retry)
+  // reuses it, so the agent collapses the duplicate instead of firing a second
+  // order. Rotated after a successful place / new draft.
+  const [draftKey, setDraftKey] = useState(uid);
   // Placing fires the order WITHOUT taking payment — we just show a short
   // confirmation (the reference) and reset for the next order. Payment is
   // collected later from the Orders detail screen, never here.
@@ -110,7 +114,7 @@ export function PosOrder({
     setCart((c) => (q <= 0 ? c.filter((l) => l.lineId !== lineId) : c.map((l) => (l.lineId === lineId ? { ...l, quantity: q } : l))));
   }
   function resetDraft() {
-    setCart([]); setErr(null); setJustPlaced(null);
+    setCart([]); setErr(null); setJustPlaced(null); setDraftKey(uid());
   }
 
   async function place() {
@@ -118,6 +122,7 @@ export function PosOrder({
     try {
       const order = await pos.create({
         terminalCode: TERMINAL_CODE,
+        idempotencyKey: draftKey,
         source,
         tableId,
         guestName: guestQuery.trim() || null,
@@ -127,6 +132,7 @@ export function PosOrder({
       });
       setJustPlaced(order.reference);
       setCart([]);
+      setDraftKey(uid());
       onOrderPlaced();
     } catch (e) { setErr((e as Error).message); }
     setBusy(false);
