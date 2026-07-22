@@ -1,6 +1,6 @@
 // Client for the local agent (the only thing this app talks to).
 import type { Brand, Combo, MenuPayload, Order, PaymentConfig, TableRow } from "./types";
-import { MOCK, mockLogin, mockPing, mockPos, mockVerifyManagerPin } from "./devMock";
+import { MOCK, mockLogin, mockPing, mockPos } from "./devMock";
 
 const AGENT = "http://127.0.0.1:6310";
 
@@ -130,27 +130,9 @@ export const pos = {
     }
     return order ?? pos.order(orderId);
   },
-  // Voiding marks the item voided + appends an item_voided event; it never
-  // deletes the item and never reduces already-recorded cash. Requires a
-  // manager PIN + a reason (the agent enforces; mock verifies too).
-  voidItem: (orderId: string, itemId: string, reason: string, managerPin: string): Promise<Order> => {
-    if (MOCK) return mockPos.voidItem(orderId, itemId, reason, managerPin);
-    return post<{ order: Order }>("/local/pos/order/void-item", { orderId, itemId, reason, managerPin }).then(
-      (d) => d.order
-    );
-  },
-  // Verifies a manager PIN without performing any action — used to gate
-  // sensitive UI actions (void, unlock, second reprint) before submitting.
-  verifyManagerPin: (pin: string): Promise<{ ok: boolean; managerName?: string }> => {
-    if (MOCK) return mockVerifyManagerPin(pin);
-    return post<{ ok: boolean; managerName?: string }>("/local/pos/manager/verify", { pin });
-  },
-  // Force-unlocks a locked order (e.g. re-opens editing after fire/lock).
-  // Appends a manager_unlock event. Requires manager PIN + reason.
-  forceUnlock: (orderId: string, managerPin: string, reason: string): Promise<Order> => {
-    if (MOCK) return mockPos.forceUnlock(orderId, managerPin, reason);
-    return post<{ order: Order }>("/local/pos/order/unlock", { orderId, managerPin, reason }).then((d) => d.order);
-  },
+  // NOTE: void / cancel / force-unlock are intentionally NOT offered offline —
+  // those are handled in the online app, which owns the audit trail. Aster's
+  // offline path only takes orders, adds items, collects payment, and reprints.
   // Method-agnostic on the wire; the UI restricts to cash offline (comp,
   // discount, and refund are disabled offline — cash-first).
   pay: (orderId: string, method: string, amount: number, note?: string): Promise<Order> => {

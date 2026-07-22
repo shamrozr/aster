@@ -19,7 +19,6 @@ import { Ic } from "./icons";
 import { ItemSheet } from "./ItemSheet";
 import { ComboSheet } from "./ComboSheet";
 import { rs, roundCash, STATUS_FLOW, typeIcon, typeLabel, lineTotal, toWireItem, uid } from "./shared";
-import { ManagerPinModal, type ManagerPinResult } from "./ManagerPinModal";
 
 type Filter = "all" | "open" | "unpaid" | "online";
 type OTab = "overview" | "items" | "payment" | "activity" | "actions";
@@ -43,14 +42,6 @@ function payableTiles(config: PaymentConfig | null): PaymentMethodDef[] {
   }
   return defs.filter((d) => enabled.includes(d.key) && !EXCLUDED_METHOD_KEYS.has(d.key) && !EXCLUDED_CATEGORIES.has(d.category));
 }
-
-// Sensitive-action gate state — which flow the ManagerPinModal is currently
-// serving, so one modal instance can back void / void-all / unlock / reprint.
-type PinFlow =
-  | { kind: "void-item"; itemId: string; itemName: string }
-  | { kind: "void-all" }
-  | { kind: "unlock" }
-  | { kind: "reprint"; printKind: "kot" | "receipt" };
 
 export function Orders() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -183,7 +174,6 @@ function OrderDetail({
   onChanged: () => void;
 }) {
   const [tab, setTab] = useState<OTab>("overview");
-  const [forceUnlocked, setForceUnlocked] = useState(false);
   const [openSec, setOpenSec] = useState<Record<string, boolean>>({ payment: true, delivery: true });
   const [pending, setPending] = useState<CartLine[]>([]);
   const [addQuery, setAddQuery] = useState("");
@@ -191,12 +181,13 @@ function OrderDetail({
   const [err, setErr] = useState<string | null>(null);
   const [sheetItem, setSheetItem] = useState<MenuItem | null>(null);
   const [comboSheet, setComboSheet] = useState<Combo | null>(null);
-  const [pinFlow, setPinFlow] = useState<PinFlow | null>(null);
 
-  useEffect(() => { setPending([]); setTab("overview"); setForceUnlocked(false); setErr(null); setPinFlow(null); }, [order.id]);
+  useEffect(() => { setPending([]); setTab("overview"); setErr(null); }, [order.id]);
 
   const kind = orderKind(order.reference);
-  const locked = kind === "online" && !forceUnlocked;
+  // Online-continued orders stay locked offline — new items can still be added
+  // (they sync up on reconnect), but voids/cancels/unlocks are online-only.
+  const locked = kind === "online";
   const paidLocked = order.payment_status === "paid";
   const table = tables.find((t) => t.id === order.table_id);
   const items = order.items ?? [];
@@ -205,54 +196,11 @@ function OrderDetail({
   const kStatus = order.kitchen_status ?? "pending";
   const stepIdx = Math.max(0, STATUS_FLOW.indexOf(kStatus));
   const nextStatus = STATUS_FLOW[stepIdx + 1];
-  const hasReprinted = (order.events ?? []).some((e) => e.type === "reprinted");
 
   async function advance() {
     if (!nextStatus) return;
     setBusy(true); setErr(null);
     try { await pos.setStatus(order.id, nextStatus); onChanged(); } catch (e) { setErr((e as Error).message); }
-    setBusy(false);
-  }
-
-  // ── Manager-PIN-gated actions ────────────────────────────────────────
-  function requestVoid(itemId: string, itemName: string) {
-    setPinFlow({ kind: "void-item", itemId, itemName });
-  }
-  function requestVoidAll() {
-    setPinFlow({ kind: "void-all" });
-  }
-  function requestUnlock() {
-    setPinFlow({ kind: "unlock" });
-  }
-  function requestReprint(printKind: "kot" | "receipt") {
-    if (hasReprinted) setPinFlow({ kind: "reprint", printKind });
-    else void doReprint(printKind);
-  }
-
-  async function onPinConfirmed(result: ManagerPinResult) {
-    const flow = pinFlow;
-    setPinFlow(null);
-    if (!flow) return;
-    setBusy(true); setErr(null);
-    try {
-      if (flow.kind === "void-item") {
-        await pos.voidItem(order.id, flow.itemId, result.reason, result.pin);
-        onChanged();
-      } else if (flow.kind === "void-all") {
-        const toVoid = items.filter((it) => !it.voided);
-        for (const it of toVoid) {
-          await pos.voidItem(order.id, it.id, result.reason, result.pin);
-        }
-        onChanged();
-      } else if (flow.kind === "unlock") {
-        await pos.forceUnlock(order.id, result.pin, result.reason);
-        setForceUnlocked(true);
-        onChanged();
-      } else if (flow.kind === "reprint") {
-        await pos.reprint(order.id, flow.printKind, result.pin);
-        onChanged();
-      }
-    } catch (e) { setErr((e as Error).message); }
     setBusy(false);
   }
 
@@ -319,8 +267,6 @@ function OrderDetail({
 
   function toggleSec(k: string) { setOpenSec((s) => ({ ...s, [k]: !s[k] })); }
 
-  const voidableCount = items.filter((it) => !it.voided).length;
-
   return (
     <div class="ord-wrap">
       <div class="ord-head">
@@ -333,10 +279,10 @@ function OrderDetail({
           <Ic id={typeIcon(order.source)} size={15} /> {typeLabel(order.source)}
         </span>
         <span class="lockpill">
-          <Ic id={locked ? "i-lock" : "i-cloud"} size={13} /> {locked ? "Locked · was online" : kind === "online" ? "Unlocked" : "Offline · OFF series"}
+          <Ic id={locked ? "i-lock" : "i-cloud"} size={13} /> {locked ? "Locked · was online" : "Offline · OFF series"}
         </span>
         <div class="rt">
-          <button onClick={() => requestReprint("receipt")}>
+          <button onClick={() => doReprint("receipt")}>
             <Ic id="i-print" size={16} /> Receipt
           </button>
         </div>
@@ -346,15 +292,9 @@ function OrderDetail({
         <div class="lockbanner">
           <Ic id="i-lock" />
           <span class="lt">
-            {locked
-              ? "This order started online. Fired items stay locked — add new items below and they sync up on reconnect. Owner/admin can unlock; the action is logged."
-              : "Force-unlocked for this session. All actions are logged for reconciliation."}
+            This order started online. Fired items stay locked — add new items below and they sync up on
+            reconnect. Voids and cancellations are handled in the online app.
           </span>
-          {locked && (
-            <button class="forceunlock" onClick={requestUnlock}>
-              <Ic id="i-unlock" size={15} /> Force unlock
-            </button>
-          )}
         </div>
       )}
       {paidLocked && (
@@ -487,11 +427,6 @@ function OrderDetail({
                   <span class="ibadge done">Done</span>
                 )}
                 {it.category && !it.voided && <span class="ibadge pizza">{it.category}</span>}
-                {!it.voided && !locked && !paidLocked && (
-                  <button class="voidbtn" onClick={() => requestVoid(it.id, it.name)} disabled={busy}>
-                    <Ic id="i-x" size={14} /> void
-                  </button>
-                )}
                 <span class="price"><Ic id="i-tag" size={15} /> {it.total_price.toLocaleString()}</span>
                 {it.voided && (
                   <span class="voidmeta">
@@ -511,11 +446,6 @@ function OrderDetail({
             <span class="qn">{it.quantity} ×</span>
             <span style={{ fontWeight: 600 }}>{it.name}</span>
             <span class={it.voided ? "ibadge voided" : "ibadge new"}>{it.voided ? "Voided" : "New"}</span>
-            {!it.voided && !paidLocked && (
-              <button class="voidbtn" onClick={() => requestVoid(it.id, it.name)} disabled={busy}>
-                <Ic id="i-x" size={14} /> void
-              </button>
-            )}
             <span class="price"><Ic id="i-tag" size={15} /> {it.total_price.toLocaleString()}</span>
             {it.voided && (
               <span class="voidmeta">
@@ -583,7 +513,7 @@ function OrderDetail({
               <button class="primary" disabled={busy || pending.length === 0} onClick={sendNew}>
                 <Ic id="i-send" size={17} /> Send new to kitchen
               </button>
-              <button class="ghost" onClick={() => requestReprint("kot")}>
+              <button class="ghost" onClick={() => doReprint("kot")}>
                 <Ic id="i-print" size={16} /> Reprint
               </button>
             </div>
@@ -630,50 +560,18 @@ function OrderDetail({
 
       <div class={`opanel ${tab === "actions" ? "on" : ""}`}>
         <div class="sendbar" style={{ marginTop: 0 }}>
-          <button class="ghost" onClick={() => requestReprint("kot")}>
+          <button class="ghost" onClick={() => doReprint("kot")}>
             <Ic id="i-print" size={16} /> Reprint KOT
           </button>
-          <button class="ghost" onClick={() => requestReprint("receipt")}>
+          <button class="ghost" onClick={() => doReprint("receipt")}>
             <Ic id="i-print" size={16} /> Reprint receipt
           </button>
         </div>
-        {!paidLocked && (
-          <>
-            <button class="voidallbtn" style={{ marginTop: 12 }} disabled={busy || voidableCount === 0} onClick={requestVoidAll}>
-              <Ic id="i-ban" size={16} /> Void all items ({voidableCount})
-            </button>
-            <p class="actionhint">
-              There is no order cancel. To kill a mistaken order, void every item on it — one manager PIN + one reason
-              covers all of them and the order stays as an auditable, zeroed record.
-            </p>
-          </>
-        )}
+        <p class="actionhint">
+          Voids and cancellations aren't done offline. To cancel or void a mistaken order, use the online
+          app once you're back on connection — it keeps the auditable record.
+        </p>
       </div>
-
-      {pinFlow && (
-        <ManagerPinModal
-          title={
-            pinFlow.kind === "void-item"
-              ? `Void "${pinFlow.itemName}"`
-              : pinFlow.kind === "void-all"
-              ? `Void all items on ${order.reference}`
-              : pinFlow.kind === "unlock"
-              ? "Force unlock order"
-              : "Manager PIN required for reprint"
-          }
-          subtitle={
-            pinFlow.kind === "void-all"
-              ? "One PIN + reason will be logged against every remaining item."
-              : pinFlow.kind === "reprint"
-              ? "This order has already been reprinted once — further reprints need approval."
-              : undefined
-          }
-          reasonMode={pinFlow.kind === "void-item" || pinFlow.kind === "void-all" ? "void" : pinFlow.kind === "unlock" ? "text" : "none"}
-          confirmLabel={pinFlow.kind === "void-item" || pinFlow.kind === "void-all" ? "Void" : pinFlow.kind === "unlock" ? "Unlock" : "Reprint"}
-          onClose={() => setPinFlow(null)}
-          onConfirm={onPinConfirmed}
-        />
-      )}
     </div>
   );
 }

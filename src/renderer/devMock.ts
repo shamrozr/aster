@@ -632,12 +632,6 @@ export async function mockLogin(
   };
 }
 
-export async function mockVerifyManagerPin(pin: string): Promise<{ ok: boolean; managerName?: string }> {
-  await delay(120);
-  const managerName = MOCK_MANAGER_PINS[pin];
-  return managerName ? { ok: true, managerName } : { ok: false };
-}
-
 export const mockPos = {
   menu: async (): Promise<MenuPayload> => {
     await delay();
@@ -733,41 +727,6 @@ export const mockPos = {
     recompute(o);
     o.events = [...(o.events ?? []), mkEvent("item_added", `Added ${newItems.length} line(s)`)];
     o.events.push(mkEvent("item_fired", `Sent ${newItems.length} line(s) to kitchen`));
-    return o;
-  },
-  // Marks the item voided in place — never deletes it, never touches
-  // already-recorded cash. Requires a valid manager PIN + a reason.
-  voidItem: async (orderId: string, itemId: string, reason: string, managerPin: string): Promise<Order> => {
-    await delay(150);
-    const o = orders.find((x) => x.id === orderId);
-    if (!o) throw new Error("Order not found");
-    const manager = MOCK_MANAGER_PINS[managerPin];
-    if (!manager) throw new Error("Invalid manager PIN");
-    if (!reason || !reason.trim()) throw new Error("A reason is required to void an item");
-    const item = (o.items ?? []).find((it) => it.id === itemId);
-    if (!item) throw new Error("Item not found");
-    item.voided = true;
-    item.voidReason = reason;
-    item.total_price = 0;
-    recompute(o);
-    o.events = [
-      ...(o.events ?? []),
-      mkEvent("item_voided", `Voided ${item.quantity}x ${item.name}`, { authorizedBy: manager, reason }),
-    ];
-    return o;
-  },
-  // Force-unlocks a locked order for correction. Requires manager PIN + reason.
-  forceUnlock: async (orderId: string, managerPin: string, reason: string): Promise<Order> => {
-    await delay(150);
-    const o = orders.find((x) => x.id === orderId);
-    if (!o) throw new Error("Order not found");
-    const manager = MOCK_MANAGER_PINS[managerPin];
-    if (!manager) throw new Error("Invalid manager PIN");
-    if (!reason || !reason.trim()) throw new Error("A reason is required to force-unlock an order");
-    o.events = [
-      ...(o.events ?? []),
-      mkEvent("manager_unlock", "Order force-unlocked for correction", { authorizedBy: manager, reason }),
-    ];
     return o;
   },
   pay: async (orderId: string, method: string, amount: number, note?: string): Promise<Order> => {
