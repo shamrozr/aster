@@ -1,5 +1,5 @@
 // Client for the local agent (the only thing this app talks to).
-import type { Brand, Combo, MenuPayload, Order, PaymentConfig, TableRow } from "./types";
+import type { Combo, MenuPayload, Order, PaymentConfig, TableRow } from "./types";
 import { MOCK, mockLogin, mockPing, mockPos } from "./devMock";
 
 const AGENT = "http://127.0.0.1:6310";
@@ -81,10 +81,6 @@ export const pos = {
     if (MOCK) return mockPos.menu();
     return authed<{ menu: MenuPayload }>("/local/pos/menu").then((d) => d.menu);
   },
-  brands: (): Promise<Brand[]> => {
-    if (MOCK) return mockPos.brands();
-    return authed<{ brands: Brand[] }>("/local/pos/brands").then((d) => d.brands);
-  },
   tables: (): Promise<TableRow[]> => {
     if (MOCK) return mockPos.tables();
     return authed<{ tables: TableRow[] }>("/local/pos/tables").then((d) => d.tables);
@@ -100,11 +96,6 @@ export const pos = {
   orders: (): Promise<Order[]> => {
     if (MOCK) return mockPos.orders();
     return authed<{ orders: Order[] }>("/local/pos/orders").then((d) => d.orders);
-  },
-  // Running/unpaid orders incl. continued ORD- tabs that came down in the snapshot.
-  openOrders: (): Promise<Order[]> => {
-    if (MOCK) return mockPos.openOrders();
-    return authed<{ orders: Order[] }>("/local/pos/orders/open").then((d) => d.orders);
   },
   // Full detail (incl. items) for a single order.
   order: (orderId: string): Promise<Order> => {

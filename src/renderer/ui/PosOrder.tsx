@@ -73,6 +73,11 @@ export function PosOrder({
     const q = search.trim().toLowerCase();
     return pool.filter((it) => it.name.toLowerCase().includes(q));
   }, [categories, catFilter, search]);
+  // Deals respect the brand filter too (a combo carries its own brand).
+  const visibleCombos = useMemo(
+    () => combos.filter((c) => brandFilter === "all" || c.brandId === brandFilter),
+    [combos, brandFilter]
+  );
 
   const tableName = tables.find((t) => t.id === tableId)?.name ?? null;
   const subtotal = cart.reduce((s, l) => s + lineTotal(l), 0);
@@ -248,16 +253,16 @@ export function PosOrder({
                     {c.name} · {c.items.length}
                   </button>
                 ))}
-                {combos.length > 0 && (
+                {visibleCombos.length > 0 && (
                   <button class={catFilter === "deals" ? "deals on" : "deals"} onClick={() => setCatFilter("deals")}>
-                    <Ic id="i-tag" size={13} /> Deals · {combos.length}
+                    <Ic id="i-tag" size={13} /> Deals · {visibleCombos.length}
                   </button>
                 )}
               </div>
 
               <div class="itemgrid">
                 {catFilter === "deals"
-                  ? combos.map((cb) => (
+                  ? visibleCombos.map((cb) => (
                       <button key={cb.id} class="itile combo" onClick={() => setComboSheet(cb)}>
                         <span class="iname">{cb.name}</span>
                         <span class="iprice">{rs(cb.price)}</span>

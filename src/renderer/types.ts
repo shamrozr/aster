@@ -81,6 +81,7 @@ export interface Combo {
   name: string;
   price: number;
   imageUrl?: string | null;
+  brandId?: string | null;
   groups: ComboGroup[];
 }
 

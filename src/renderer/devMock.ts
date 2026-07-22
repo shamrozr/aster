@@ -210,6 +210,7 @@ const combos: Combo[] = [
     id: "combo-1",
     name: "Zinger Deal",
     price: 850,
+    brandId: "b1",
     groups: [
       { id: "g1", label: "Burger", items: [{ id: "gi1", menuItemId: "i-bg-1", variantId: null, isDefault: true, upcharge: 0 }] },
       { id: "g2", label: "Side", items: [{ id: "gi2", menuItemId: "i-sd-1", variantId: null, isDefault: true, upcharge: 0 }] },
@@ -220,6 +221,7 @@ const combos: Combo[] = [
     id: "combo-2",
     name: "Family Pizza Deal",
     price: 2490,
+    brandId: "b2",
     groups: [
       { id: "g4", label: "Pizza", items: [{ id: "gi4", menuItemId: "i-pz-1", variantId: "v-pz1-l", isDefault: true, upcharge: 0 }] },
       { id: "g5", label: "Starter", items: [{ id: "gi5", menuItemId: "i-st-1", variantId: null, isDefault: true, upcharge: 0 }] },
@@ -230,6 +232,7 @@ const combos: Combo[] = [
     id: "combo-3",
     name: "Double Burger Combo",
     price: 1050,
+    brandId: "b1",
     groups: [
       { id: "g7", label: "Burger", items: [{ id: "gi7", menuItemId: "i-bg-4", variantId: null, isDefault: true, upcharge: 0 }] },
       { id: "g8", label: "Side", items: [{ id: "gi8", menuItemId: "i-sd-2", variantId: null, isDefault: true, upcharge: 0 }] },
@@ -637,10 +640,6 @@ export const mockPos = {
     await delay();
     return menu;
   },
-  brands: async (): Promise<Brand[]> => {
-    await delay();
-    return brands;
-  },
   tables: async (): Promise<TableRow[]> => {
     await delay();
     return tables;
@@ -656,10 +655,6 @@ export const mockPos = {
   orders: async (): Promise<Order[]> => {
     await delay();
     return orders;
-  },
-  openOrders: async (): Promise<Order[]> => {
-    await delay();
-    return orders.filter((o) => o.status === "open");
   },
   order: async (orderId: string): Promise<Order> => {
     await delay();
