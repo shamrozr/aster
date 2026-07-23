@@ -1,5 +1,5 @@
 import { useState } from "preact/hooks";
-import type { CartLine, Combo, ComboPick, MenuPayload } from "../types";
+import type { CartLine, CartModifier, Combo, ComboPick, MenuPayload } from "../types";
 
 const rs = (n: number) => "Rs " + Math.round(n).toLocaleString();
 const uid = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
@@ -35,10 +35,10 @@ export function ComboSheet({
 
   const allPicked = combo.groups.every((g) => choice[g.id]);
   const picks: ComboPick[] = combo.groups
-    .map((g) => {
+    .map((g): ComboPick | null => {
       const picked = g.items.find((i) => i.id === choice[g.id]);
       if (!picked) return null;
-      return { groupId: g.id, menuItemId: picked.menuItemId, variantId: picked.variantId, upcharge: picked.upcharge };
+      return { groupId: g.id, menuItemId: picked.menuItemId, variantId: picked.variantId, upcharge: picked.upcharge, modifiers: [] as CartModifier[] };
     })
     .filter((p): p is ComboPick => p !== null);
   const upcharge = picks.reduce((s, p) => s + p.upcharge, 0);

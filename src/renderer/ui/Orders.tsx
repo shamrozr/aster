@@ -8,6 +8,8 @@ import {
   type Combo,
   type MenuItem,
   type MenuPayload,
+  type Modifier,
+  type ModifierGroup,
   type Order,
   type OrderEvent,
   type OrderEventType,
@@ -18,7 +20,8 @@ import {
 import { Ic } from "./icons";
 import { ItemSheet } from "./ItemSheet";
 import { ComboSheet } from "./ComboSheet";
-import { rs, roundCash, STATUS_FLOW, typeIcon, typeLabel, lineTotal, toWireItem, uid } from "./shared";
+import { ComboPicks } from "./ComboPicks";
+import { applyPickAddon, rs, roundCash, STATUS_FLOW, typeIcon, typeLabel, lineTotal, toWireItem, uid } from "./shared";
 
 type Filter = "all" | "open" | "unpaid" | "online";
 type OTab = "overview" | "items" | "payment" | "activity" | "actions";
@@ -210,6 +213,8 @@ function OrderDetail({
   }
 
   const menuItems: MenuItem[] = useMemo(() => (menu?.categories ?? []).flatMap((c) => c.items), [menu]);
+  // id→item lookup so a staged combo pick can resolve its OWN addon groups.
+  const itemById = useMemo(() => new Map(menuItems.map((it) => [it.id, it])), [menuItems]);
   const addResults = useMemo(() => {
     if (!addQuery.trim()) return { items: [] as MenuItem[], combos: [] as Combo[] };
     const q = addQuery.trim().toLowerCase();
@@ -225,6 +230,9 @@ function OrderDetail({
   }
   function removePending(lineId: string) {
     setPending((p) => p.filter((l) => l.lineId !== lineId));
+  }
+  function togglePendingAddon(lineId: string, pickIdx: number, g: ModifierGroup, m: Modifier) {
+    setPending((p) => p.map((l) => (l.lineId === lineId ? applyPickAddon(l, pickIdx, g, m) : l)));
   }
   function tapMenuItem(it: MenuItem) {
     if (!it.available) return;
@@ -496,15 +504,24 @@ function OrderDetail({
               <p class="muted">No staged items yet — search above to add.</p>
             ) : (
               pending.map((l) => (
-                <div class="irow" key={l.lineId}>
-                  <span class="qn">{l.quantity} ×</span>
-                  <span style={{ fontWeight: 600 }}>{l.name}</span>
-                  <span class="ibadge new">New</span>
-                  {l.modifiers.length > 0 && <span class="voidmeta" style={{ color: "var(--muted)" }}>{l.modifiers.map((m) => m.name).join(", ")}</span>}
-                  <button class="voidbtn" onClick={() => removePending(l.lineId)}>
-                    <Ic id="i-x" size={14} /> remove
-                  </button>
-                  <span class="price"><Ic id="i-tag" size={15} /> {lineTotal(l).toLocaleString()}</span>
+                <div class="pendrow" key={l.lineId}>
+                  <div class="irow">
+                    <span class="qn">{l.quantity} ×</span>
+                    <span style={{ fontWeight: 600 }}>{l.name}</span>
+                    <span class="ibadge new">New</span>
+                    {l.modifiers.length > 0 && <span class="voidmeta" style={{ color: "var(--muted)" }}>{l.modifiers.map((m) => m.name).join(", ")}</span>}
+                    <button class="voidbtn" onClick={() => removePending(l.lineId)}>
+                      <Ic id="i-x" size={14} /> remove
+                    </button>
+                    <span class="price"><Ic id="i-tag" size={15} /> {lineTotal(l).toLocaleString()}</span>
+                  </div>
+                  {l.combo && (
+                    <ComboPicks
+                      line={l}
+                      itemById={itemById}
+                      onToggleAddon={(pi, g, m) => togglePendingAddon(l.lineId, pi, g, m)}
+                    />
+                  )}
                 </div>
               ))
             )}

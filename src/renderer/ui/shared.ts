@@ -1,5 +1,5 @@
 // Small helpers shared across the POS + Orders screens.
-import type { CartLine } from "../types";
+import type { CartLine, CartModifier, Modifier, ModifierGroup } from "../types";
 
 export const rs = (n: number) => "Rs " + Math.round(n).toLocaleString();
 export const uid = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
@@ -44,6 +44,34 @@ export function toWireItem(l: CartLine) {
     comboPrice: combo?.comboPrice ?? null,
     picks: combo?.picks ?? null,
   };
+}
+
+// Toggle an addon on one combo component (pick), honouring the group's
+// single/multi-select + maxSelect rules, and recompute the combo line's unit
+// price so totals + the wire payload stay correct
+// (unitPrice = comboPrice + Σupcharge + Σaddons). Pure — returns a new line.
+// Shared by the main POS cart and the running-order staging cart so both edit
+// combo addons identically.
+export function applyPickAddon(line: CartLine, pickIdx: number, group: ModifierGroup, mod: Modifier): CartLine {
+  if (!line.combo) return line;
+  const picks = line.combo.picks.map((p, idx) => {
+    if (idx !== pickIdx) return p;
+    const cur = p.modifiers ?? [];
+    const has = cur.some((x) => x.id === mod.id);
+    const inGroup = (x: CartModifier) => group.modifiers.some((gm) => gm.id === x.id);
+    let next: CartModifier[];
+    if (group.multiSelect) {
+      next = has ? cur.filter((x) => x.id !== mod.id) : [...cur, { id: mod.id, name: mod.name, priceAdjustment: mod.priceAdjustment }];
+      if (!has && group.maxSelect && next.filter(inGroup).length > group.maxSelect) return p; // reject over max
+    } else {
+      const others = cur.filter((x) => !inGroup(x)); // single-select: drop this group's others
+      next = has ? others : [...others, { id: mod.id, name: mod.name, priceAdjustment: mod.priceAdjustment }];
+    }
+    return { ...p, modifiers: next };
+  });
+  const unitPrice =
+    line.combo.comboPrice + picks.reduce((s, p) => s + p.upcharge + (p.modifiers ?? []).reduce((a, x) => a + x.priceAdjustment, 0), 0);
+  return { ...line, unitPrice, combo: { ...line.combo, picks } };
 }
 
 export function roundCash(n: number, nearest: number): number {

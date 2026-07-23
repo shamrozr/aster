@@ -120,6 +120,11 @@ export interface ComboPick {
   menuItemId: string;
   variantId: string | null;
   upcharge: number;
+  // Addons chosen for this component — these are the picked menu item's OWN
+  // modifierGroups (e.g. the burger's "Extra Cheese"). Picked in the cart, not
+  // in the combo builder. Flow to the agent inside `picks` so reconcile can
+  // explode the combo WITH its addons and deplete their stock.
+  modifiers?: CartModifier[];
 }
 
 export interface ComboSelection {

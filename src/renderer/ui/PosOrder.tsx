@@ -6,13 +6,16 @@ import {
   type Combo,
   type MenuItem,
   type MenuPayload,
-  type PaymentConfig,
+  type Modifier,
+  type ModifierGroup,
   type TableRow,
+  type PaymentConfig,
 } from "../types";
 import { Ic } from "./icons";
 import { ItemSheet } from "./ItemSheet";
 import { ComboSheet } from "./ComboSheet";
-import { lineTotal, rs, SOURCE_LABEL, SOURCES, toWireItem, uid, type Source } from "./shared";
+import { ComboPicks } from "./ComboPicks";
+import { applyPickAddon, lineTotal, rs, SOURCE_LABEL, SOURCES, toWireItem, uid, type Source } from "./shared";
 import type { AsterUser } from "../agent";
 
 export function PosOrder({
@@ -82,6 +85,14 @@ export function PosOrder({
     () => combos.filter((c) => brandFilter === "all" || c.brandId === brandFilter),
     [combos, brandFilter]
   );
+  // Flat id→item lookup so a combo pick (which only carries menuItemId) can
+  // resolve its display name AND its OWN modifierGroups — the combo's per-item
+  // addons are just the underlying menu item's modifiers.
+  const itemById = useMemo(() => {
+    const m = new Map<string, MenuItem>();
+    for (const c of menu?.categories ?? []) for (const it of c.items) m.set(it.id, it);
+    return m;
+  }, [menu]);
 
   const tableName = tables.find((t) => t.id === tableId)?.name ?? null;
   const subtotal = cart.reduce((s, l) => s + lineTotal(l), 0);
@@ -112,6 +123,10 @@ export function PosOrder({
   }
   function setQty(lineId: string, q: number) {
     setCart((c) => (q <= 0 ? c.filter((l) => l.lineId !== lineId) : c.map((l) => (l.lineId === lineId ? { ...l, quantity: q } : l))));
+  }
+  // Apply an addon toggle to one combo component on the given cart line.
+  function toggleCartPickAddon(lineId: string, pickIdx: number, g: ModifierGroup, m: Modifier) {
+    setCart((c) => c.map((l) => (l.lineId === lineId ? applyPickAddon(l, pickIdx, g, m) : l)));
   }
   function resetDraft() {
     setCart([]); setErr(null); setJustPlaced(null); setDraftKey(uid());
@@ -354,6 +369,13 @@ export function PosOrder({
                           <span class="cl-total">{rs(lineTotal(l))}</span>
                         </div>
                         {l.modifiers.length > 0 && <div class="cl-mods">{l.modifiers.map((m) => m.name).join(", ")}</div>}
+                        {l.combo && (
+                          <ComboPicks
+                            line={l}
+                            itemById={itemById}
+                            onToggleAddon={(pi, g, m) => toggleCartPickAddon(l.lineId, pi, g, m)}
+                          />
+                        )}
                         <div class="cl-bottom">
                           <span class="qtystep">
                             <button onClick={() => setQty(l.lineId, l.quantity - 1)}>−</button>

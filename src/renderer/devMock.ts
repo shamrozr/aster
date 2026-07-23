@@ -162,7 +162,39 @@ const menu: MenuPayload = {
       name: "Sides",
       brandId: "b1",
       items: [
-        { id: "i-sd-1", name: "Fries (Regular)", price: 220, available: true, modifierGroups: [], variants: [] },
+        {
+          id: "i-sd-1",
+          name: "Fries (Regular)",
+          price: 220,
+          available: true,
+          variants: [],
+          modifierGroups: [
+            {
+              id: "mg-sd1-style",
+              name: "Make it",
+              required: false,
+              multiSelect: false,
+              minSelect: 0,
+              maxSelect: 1,
+              modifiers: [
+                { id: "m-masala", name: "Masala Fries", priceAdjustment: 50 },
+                { id: "m-cheesy", name: "Cheesy Fries", priceAdjustment: 90 },
+              ],
+            },
+            {
+              id: "mg-sd1-dip",
+              name: "Add dip",
+              required: false,
+              multiSelect: true,
+              minSelect: 0,
+              maxSelect: 2,
+              modifiers: [
+                { id: "m-ketchup", name: "Extra Ketchup", priceAdjustment: 20 },
+                { id: "m-garlic", name: "Garlic Mayo", priceAdjustment: 40 },
+              ],
+            },
+          ],
+        },
         { id: "i-sd-2", name: "Fries (Large)", price: 320, available: true, modifierGroups: [], variants: [] },
         { id: "i-sd-3", name: "Onion Rings", price: 280, available: true, modifierGroups: [], variants: [] },
         { id: "i-sd-4", name: "Coleslaw", price: 180, available: true, modifierGroups: [], variants: [] },
